@@ -1,0 +1,551 @@
+app:
+  description: 千问驱动的对话式图片名片工作流，完成资料采集和确认后调用渲染接口生成图片名片
+  icon: 🪪
+  icon_background: '#E8F1FF'
+  icon_type: emoji
+  mode: advanced-chat
+  name: 名片工坊-图片渲染版
+  use_icon_as_answer_icon: false
+dependencies:
+- current_identifier: null
+  type: marketplace
+  value:
+    marketplace_plugin_unique_identifier: langgenius/tongyi:0.1.35@7dd9436c26b97b3147840f7c48d50392395eeab282372dc2cec56c47f1a1844e
+    version: null
+kind: app
+version: 0.6.0
+workflow:
+  conversation_variables: []
+  environment_variables: []
+  features:
+    file_upload:
+      allowed_file_extensions: []
+      allowed_file_types: []
+      allowed_file_upload_methods: []
+      enabled: false
+      fileUploadConfig:
+        attachment_image_file_size_limit: 2
+        audio_file_size_limit: 50
+        batch_count_limit: 5
+        file_size_limit: 15
+        file_upload_limit: 20
+        image_file_batch_limit: 10
+        image_file_size_limit: 10
+        single_chunk_attachment_limit: 10
+        video_file_size_limit: 100
+        workflow_file_upload_limit: 10
+      number_limits: 3
+    opening_statement: 欢迎来到名片工坊。我会先通过对话帮你收集名片信息，资料齐全后自动生成名片预览给你确认。你确认没问题后，我会调用图片渲染接口生成一张真正可下载的图片名片。
+    retriever_resource:
+      enabled: false
+    sensitive_word_avoidance:
+      enabled: false
+    speech_to_text:
+      enabled: false
+    suggested_questions:
+    - 我要制作我的商务名片
+    suggested_questions_after_answer:
+      enabled: false
+    text_to_speech:
+      enabled: true
+      language: zh-CN
+      voice: ''
+  graph:
+    edges:
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: start
+        targetType: llm
+      id: start_node-source-collector_llm-target
+      source: start_node
+      sourceHandle: source
+      target: collector_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInIteration: false
+        isInLoop: false
+        sourceType: llm
+        targetType: if-else
+      id: collector_llm-source-status_check-target
+      source: collector_llm
+      sourceHandle: source
+      target: status_check
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: answer
+      id: status_check-false-answer_node-target
+      source: status_check
+      sourceHandle: 'false'
+      target: answer_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: if-else
+        targetType: llm
+      id: status_check-true-preview_llm-target
+      source: status_check
+      sourceHandle: 'true'
+      target: preview_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: human-input
+      id: preview_llm-source-confirm_form-target
+      source: preview_llm
+      sourceHandle: source
+      target: confirm_form
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: human-input
+        targetType: llm
+      id: confirm_form-commit-html_card_llm-target
+      source: confirm_form
+      sourceHandle: commit
+      target: html_card_llm
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: llm
+        targetType: http-request
+      id: html_card_llm-source-render_request-target
+      source: html_card_llm
+      sourceHandle: source
+      target: render_request
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    - data:
+        isInLoop: false
+        sourceType: http-request
+        targetType: answer
+      id: render_request-source-final_answer_node-target
+      source: render_request
+      sourceHandle: source
+      target: final_answer_node
+      targetHandle: target
+      type: custom
+      zIndex: 0
+    nodes:
+    - data:
+        selected: false
+        title: 用户输入
+        type: start
+        variables: []
+      height: 72
+      id: start_node
+      position:
+        x: 40
+        y: 300
+      positionAbsolute:
+        x: 40
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 242
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#sys.query#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: true
+            size: 20
+        model:
+          completion_params:
+            temperature: 0.3
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: collector-system-prompt
+          role: system
+          text: |
+            你是“名片工坊”的商务名片顾问。
+
+            你的任务是通过自然对话，一步一步收集生成商务名片所需的信息。
+
+            必采字段：
+            1. name: 姓名
+            2. title: 头衔或职位
+            3. company: 公司、品牌或项目名
+            4. city: 所在城市
+            5. mobile: 手机号
+            6. wechat: 微信号
+            7. email: 邮箱或备用联系方式
+            8. slogan: 一句话定位
+            9. business: 主营业务
+            10. strengths: 核心优势
+            11. target_customer: 希望对接的客户或合作对象
+            12. card_style: 名片风格，只允许以下五个值之一
+               - 商务简约
+               - 高端黑金
+               - 现代科技
+               - 新中式雅致
+               - 个人IP
+            13. card_tone: 名片语气，只允许以下四个值之一
+               - 正式专业
+               - 温暖亲和
+               - 高端成交
+               - 年轻活力
+
+            对话规则：
+            - 严格一次只问一个问题。
+            - 用户一次回答多个字段时，全部记录，只追问下一个缺失字段。
+            - 开始时先问姓名，再问头衔、公司、城市，再补联系方式和业务信息。
+            - 当轮到 card_style 时，必须给用户可选项，不要让用户不知道怎么选。
+            - 当轮到 card_tone 时，也必须给用户可选项。
+            - 信息未收集完整前，只输出下一句要发给用户的话，不要解释规则，不要输出 JSON。
+            - 信息完整后，只输出严格 JSON，不要有任何多余文字。
+
+            输出格式：
+            信息不完整时，直接输出下一句对话。
+            信息完整时，严格输出下面 JSON，不增删字段：
+            {
+              "status": "COMPLETE",
+              "data": {
+                "name": "",
+                "title": "",
+                "company": "",
+                "city": "",
+                "mobile": "",
+                "wechat": "",
+                "email": "",
+                "slogan": "",
+                "business": "",
+                "strengths": "",
+                "target_customer": "",
+                "card_style": "",
+                "card_tone": ""
+              }
+            }
+        selected: false
+        title: 名片信息采集顾问
+        type: llm
+        vision:
+          enabled: false
+      height: 90
+      id: collector_llm
+      position:
+        x: 360
+        y: 300
+      positionAbsolute:
+        x: 360
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    - data:
+        cases:
+        - case_id: 'true'
+          conditions:
+          - comparison_operator: contains
+            id: complete-check
+            value: '"status": "COMPLETE"'
+            varType: string
+            variable_selector:
+            - collector_llm
+            - text
+          id: 'true'
+          logical_operator: and
+        selected: false
+        title: 信息完整判断
+        type: if-else
+      height: 148
+      id: status_check
+      position:
+        x: 700
+        y: 300
+      positionAbsolute:
+        x: 700
+        y: 300
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#collector_llm.text#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 1
+        model:
+          completion_params:
+            temperature: 0.6
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: preview-system-prompt
+          role: system
+          text: |
+            你是高级商务名片策划师。
+            现在你会收到一段已完成采集的 JSON，请直接输出一份“名片预览稿”。
+
+            要求：
+            - 不要输出 JSON。
+            - 直接输出中文可读预览稿。
+            - 语气和排版必须匹配用户选择的 card_style 和 card_tone。
+            - 内容必须包含：姓名、头衔、公司、城市、主营业务、核心优势、目标客户、手机号、微信号、邮箱。
+            - 开头先写一句：请确认以下名片内容，如需微调可直接修改后再点击确认下载。
+            - 然后输出一张排版清晰的文字版名片。
+        - id: preview-user-prompt
+          role: user
+          text: |
+            已完成采集的结构化结果：
+            {{#collector_llm.text#}}
+        selected: false
+        title: 名片预览生成器
+        type: llm
+        vision:
+          enabled: false
+      height: 90
+      id: preview_llm
+      position:
+        x: 1040
+        y: 260
+      positionAbsolute:
+        x: 1040
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 244
+    - data:
+        delivery_methods:
+        - enabled: true
+          id: aaf989d2-de52-4cc0-840f-242d1fa5d9df
+          type: webapp
+        form_content: '### 名片最终确认
+
+          请检查下面的名片预览内容。
+
+          如果你想微调措辞、联系方式、排版内容，可以直接在下方文本框里修改。
+
+          修改完成后，点击底部“确认下载”。
+
+          {{#$output.final_card#}}
+
+          '
+        inputs:
+        - default:
+            selector:
+            - preview_llm
+            - text
+            type: variable
+            value: ''
+          output_variable_name: final_card
+          type: paragraph
+        selected: false
+        timeout: 3
+        timeout_unit: day
+        title: 名片确认
+        type: human-input
+        user_actions:
+        - button_style: primary
+          id: commit
+          title: 确认下载
+      height: 162
+      id: confirm_form
+      position:
+        x: 1370
+        y: 260
+      positionAbsolute:
+        x: 1370
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 241
+    - data:
+        context:
+          enabled: false
+          variable_selector: []
+        memory:
+          query_prompt_template: '{{#confirm_form.final_card#}}'
+          role_prefix:
+            assistant: ''
+            user: ''
+          window:
+            enabled: false
+            size: 1
+        model:
+          completion_params:
+            temperature: 0.2
+          mode: chat
+          name: qwen-plus
+          provider: langgenius/tongyi/tongyi
+        prompt_template:
+        - id: html-card-system-prompt
+          role: system
+          text: |
+            你是商务名片前端模板设计师。
+            你会收到：
+            1. 原始结构化名片信息
+            2. 用户最终确认后的名片内容
+
+            你的任务是输出一个可直接渲染为图片的完整 HTML。
+
+            严格要求：
+            - 只输出完整 HTML，不要解释，不要 markdown，不要 JSON。
+            - 必须包含 <html>、<head>、<style>、<body>。
+            - 所有 CSS 都内联在 <style> 中。
+            - 页面尺寸按名片比例设计，建议 1125x637 或接近这个比例。
+            - 背景、配色、字体、层次必须明显体现用户选择的名片风格和语气。
+            - 名片中必须展示：姓名、头衔、公司、城市、主营业务、核心优势、目标客户、手机号、微信号、邮箱。
+            - 页面必须适合直接截图或转成 PNG。
+            - 不要输出脚本，不要依赖外部资源。
+        - id: html-card-user-prompt
+          role: user
+          text: |
+            原始结构化信息：
+            {{#collector_llm.text#}}
+
+            用户最终确认的名片内容：
+            {{#confirm_form.final_card#}}
+        selected: false
+        title: 名片HTML模板生成器
+        type: llm
+        vision:
+          enabled: false
+      height: 90
+      id: html_card_llm
+      position:
+        x: 1700
+        y: 260
+      positionAbsolute:
+        x: 1700
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    - data:
+        authorization:
+          config: null
+          type: no-auth
+        body:
+          data:
+          - id: key-value-html-content
+            key: html_content
+            type: text
+            value: '{{#html_card_llm.text#}}'
+          - id: key-value-output-filename
+            key: output_filename
+            type: text
+            value: business_card.png
+          type: json
+        headers: Content-Type:application/json
+        method: post
+        params: ''
+        retry_config:
+          max_retries: 3
+          retry_enabled: true
+          retry_interval: 1000
+        selected: false
+        ssl_verify: true
+        timeout:
+          max_connect_timeout: 300
+          max_read_timeout: 600
+          max_write_timeout: 600
+        title: 图片渲染接口
+        type: http-request
+        url: https://your-public-render-api.example.com/render-card
+        variables: []
+      height: 150
+      id: render_request
+      position:
+        x: 2040
+        y: 260
+      positionAbsolute:
+        x: 2040
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    - data:
+        answer: '{{#collector_llm.text#}}'
+        selected: false
+        title: 继续追问
+        type: answer
+        variables: []
+      height: 105
+      id: answer_node
+      position:
+        x: 1040
+        y: 420
+      positionAbsolute:
+        x: 1040
+        y: 420
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    - data:
+        answer: |
+          名片图片已生成，下面是预览与下载链接。
+
+          ![名片图片]({{#render_request.body.image_url#}})
+
+          [点击下载名片图片]({{#render_request.body.image_url#}})
+
+          如果这里没有显示图片，请检查“图片渲染接口”节点里的接口地址是否已经替换为你自己的公网渲染服务，并确认该接口返回 JSON 字段 `image_url`。
+        selected: false
+        title: 输出图片名片
+        type: answer
+        variables: []
+      height: 105
+      id: final_answer_node
+      position:
+        x: 2360
+        y: 260
+      positionAbsolute:
+        x: 2360
+        y: 260
+      selected: false
+      sourcePosition: right
+      targetPosition: left
+      type: custom
+      width: 260
+    viewport:
+      x: 120
+      y: 80
+      zoom: 0.9
+  rag_pipeline_variables: []
