@@ -1,4 +1,4 @@
-FROM mcr.microsoft.com/playwright:v1.54.2-noble
+FROM mcr.microsoft.com/playwright:v1.59.1-noble
 
 WORKDIR /app
 
@@ -13,3 +13,4 @@ ENV HOST=0.0.0.0
 EXPOSE 3200
 
 CMD ["node", "server.js"]
+
